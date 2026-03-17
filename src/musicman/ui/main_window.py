@@ -98,7 +98,7 @@ class MainWindow(QMainWindow):
         self._device_panel = DevicePanel()
         self._splitter.addWidget(self._device_panel)
 
-        self._splitter.setSizes([350, 300, 250])
+        self._splitter.setSizes([300, 300, 300])
         layout.addWidget(self._splitter, stretch=1)
 
     def _setup_statusbar(self):
@@ -126,7 +126,6 @@ class MainWindow(QMainWindow):
 
     def _scan_library(self, root: str):
         self._statusbar.showMessage(f"Scanning {root}...")
-        self._library_panel.set_library_root(root)
         worker = ScanWorker(Path(root))
         worker.signals.finished.connect(self._on_scan_finished)
         worker.signals.error.connect(self._on_scan_error)
