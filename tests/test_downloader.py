@@ -24,6 +24,14 @@ def _fake_ytdl(files_to_create, retcode=0, error=None):
         def download(self, urls):
             if error:
                 raise error
+            # Call progress hooks if registered
+            for hook in self.opts.get("progress_hooks", []):
+                hook({
+                    "status": "downloading",
+                    "downloaded_bytes": 500,
+                    "total_bytes": 1000,
+                    "filename": "test.opus",
+                })
             for f in files_to_create:
                 f.write_bytes(b"fake audio")
             return retcode
@@ -76,6 +84,16 @@ class TestDownloadVideoAudio:
         cancel.set()
         with pytest.raises(DownloadError, match="cancelled"):
             download_video_audio("test123", tmp_path, cancel_event=cancel)
+
+    @patch("musicman.services.downloader.yt_dlp.YoutubeDL")
+    def test_progress_callback_called(self, mock_ydl_cls, tmp_path):
+        output_file = tmp_path / "Test Video.opus"
+        mock_ydl_cls.side_effect = _fake_ytdl([output_file])
+        cb = MagicMock()
+
+        download_video_audio("test123", tmp_path, progress_callback=cb)
+
+        cb.assert_called_once_with(50.0, "test.opus")
 
 
 class TestDownloadPlaylistAudio:

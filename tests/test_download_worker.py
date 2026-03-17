@@ -94,3 +94,35 @@ class TestDownloadWorker:
         assert not worker._cancel_event.is_set()
         worker.cancel()
         assert worker._cancel_event.is_set()
+
+    @patch("musicman.workers.download_worker.read_track")
+    @patch("musicman.workers.download_worker.download_video_audio")
+    def test_progress_signal_emitted(self, mock_dl, mock_read):
+        fake_path = Path("/downloads/song.opus")
+        mock_dl.return_value = fake_path
+        mock_read.return_value = Track(
+            path=fake_path,
+            title="Test Song",
+            artist="Artist",
+            album="Album",
+            duration=120.0,
+            format="opus",
+        )
+
+        worker = DownloadWorker("test123", Path("/downloads"))
+        worker.signals.finished = MagicMock()
+        worker.signals.error = MagicMock()
+        worker.signals.progress = MagicMock()
+
+        # Capture the progress_callback passed to download_video_audio and call it
+        def capture_and_call(*args, **kwargs):
+            cb = kwargs.get("progress_callback")
+            if cb:
+                cb(50.0, "song.opus")
+            return fake_path
+
+        mock_dl.side_effect = capture_and_call
+
+        worker.run()
+
+        worker.signals.progress.emit.assert_called_once_with(50.0, "song.opus")

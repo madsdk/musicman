@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMenuBar,
+    QProgressBar,
     QPushButton,
     QRadioButton,
     QSplitter,
@@ -135,6 +136,12 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self._statusbar)
         self._statusbar.showMessage("Ready")
 
+        self._download_progress = QProgressBar()
+        self._download_progress.setFixedWidth(150)
+        self._download_progress.setRange(0, 100)
+        self._download_progress.setVisible(False)
+        self._statusbar.addPermanentWidget(self._download_progress)
+
     def _open_settings(self):
         old_root = self._settings.library_root
         dlg = SettingsDialog(self._settings, self)
@@ -200,11 +207,14 @@ class MainWindow(QMainWindow):
         self._download_btn.setEnabled(False)
         self._stop_btn.setEnabled(True)
         self._statusbar.showMessage("Downloading...")
+        self._download_progress.setValue(0)
+        self._download_progress.setVisible(True)
 
         is_playlist = self._playlist_radio.isChecked()
         worker = DownloadWorker(id_value, Path(dl_folder), is_playlist=is_playlist)
         worker.signals.finished.connect(self._on_download_finished)
         worker.signals.error.connect(self._on_download_error)
+        worker.signals.progress.connect(self._on_download_progress)
         self._download_worker = worker
         self._thread_pool.start(worker)
 
@@ -213,9 +223,15 @@ class MainWindow(QMainWindow):
             self._download_worker.cancel()
             self._statusbar.showMessage("Download stopped.")
 
+    def _on_download_progress(self, percent: float, filename: str):
+        self._download_progress.setValue(int(percent))
+        name = Path(filename).name if filename else ""
+        self._statusbar.showMessage(f"Downloading {name}... {percent:.0f}%")
+
     def _on_download_finished(self, tracks):
         self._download_worker = None
         self._stop_btn.setEnabled(False)
+        self._download_progress.setVisible(False)
         self._all_tracks.extend(tracks)
         self._library_panel.load_tracks(self._all_tracks)
         count = len(tracks)
@@ -226,6 +242,7 @@ class MainWindow(QMainWindow):
     def _on_download_error(self, msg):
         self._download_worker = None
         self._stop_btn.setEnabled(False)
+        self._download_progress.setVisible(False)
         self._statusbar.showMessage(f"Download error: {msg}")
         self._download_btn.setEnabled(True)
 

@@ -13,6 +13,7 @@ from musicman.services.scanner import read_track
 class DownloadSignals(QObject):
     finished = Signal(list)
     error = Signal(str)
+    progress = Signal(float, str)
 
 
 class DownloadWorker(QRunnable):
@@ -31,13 +32,20 @@ class DownloadWorker(QRunnable):
     @Slot()
     def run(self):
         try:
+            def _on_progress(percent: float, filename: str) -> None:
+                self.signals.progress.emit(percent, filename)
+
             if self.is_playlist:
                 filepaths = download_playlist_audio(
-                    self.id_value, self.output_dir, cancel_event=self._cancel_event,
+                    self.id_value, self.output_dir,
+                    cancel_event=self._cancel_event,
+                    progress_callback=_on_progress,
                 )
             else:
                 filepaths = [download_video_audio(
-                    self.id_value, self.output_dir, cancel_event=self._cancel_event,
+                    self.id_value, self.output_dir,
+                    cancel_event=self._cancel_event,
+                    progress_callback=_on_progress,
                 )]
 
             tracks = []
