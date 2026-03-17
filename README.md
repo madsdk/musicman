@@ -6,7 +6,7 @@ A PySide6 desktop app for managing music on old-school MP3 players that play fil
 
 - Python 3.10+
 - ffmpeg (for transcoding non-MP3 files)
-- yt-dlp (optional, for downloading audio from YouTube)
+- yt-dlp (installed automatically with pip, for downloading audio from YouTube)
 
 Install system dependencies via your package manager:
 
@@ -80,7 +80,6 @@ The resulting app bundle is written to `dist/MusicMan.app`. You can drag it into
 
 **Requirements for the build machine:**
 - macOS with ffmpeg installed (bundled into the app automatically)
-- yt-dlp installed (`pip install yt-dlp`) if you want YouTube download support in the bundle
 
 ### Project structure
 
