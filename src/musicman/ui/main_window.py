@@ -36,6 +36,7 @@ class MainWindow(QMainWindow):
         self._settings = Settings()
         self._thread_pool = QThreadPool()
         self._transfer_worker: TransferWorker | None = None
+        self._download_worker: DownloadWorker | None = None
         self._all_tracks: list = []
 
         self.setWindowTitle("MusicMan")
@@ -95,6 +96,10 @@ class MainWindow(QMainWindow):
         self._download_btn.clicked.connect(self._on_download)
         self._download_btn.setEnabled(bool(self._settings.download_folder))
         dl_bar.addWidget(self._download_btn)
+        self._stop_btn = QPushButton("Stop")
+        self._stop_btn.clicked.connect(self._on_stop_download)
+        self._stop_btn.setEnabled(False)
+        dl_bar.addWidget(self._stop_btn)
         layout.addLayout(dl_bar)
 
         # Three-panel splitter
@@ -193,15 +198,24 @@ class MainWindow(QMainWindow):
             return
 
         self._download_btn.setEnabled(False)
+        self._stop_btn.setEnabled(True)
         self._statusbar.showMessage("Downloading...")
 
         is_playlist = self._playlist_radio.isChecked()
         worker = DownloadWorker(id_value, Path(dl_folder), is_playlist=is_playlist)
         worker.signals.finished.connect(self._on_download_finished)
         worker.signals.error.connect(self._on_download_error)
+        self._download_worker = worker
         self._thread_pool.start(worker)
 
+    def _on_stop_download(self):
+        if self._download_worker is not None:
+            self._download_worker.cancel()
+            self._statusbar.showMessage("Download stopped.")
+
     def _on_download_finished(self, tracks):
+        self._download_worker = None
+        self._stop_btn.setEnabled(False)
         self._all_tracks.extend(tracks)
         self._library_panel.load_tracks(self._all_tracks)
         count = len(tracks)
@@ -210,6 +224,8 @@ class MainWindow(QMainWindow):
         self._download_btn.setEnabled(True)
 
     def _on_download_error(self, msg):
+        self._download_worker = None
+        self._stop_btn.setEnabled(False)
         self._statusbar.showMessage(f"Download error: {msg}")
         self._download_btn.setEnabled(True)
 
@@ -265,6 +281,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self._settings.save_geometry(self.saveGeometry())
         self._settings.save_state(self.saveState())
+        if self._download_worker is not None:
+            self._download_worker.cancel()
         self._thread_pool.clear()
         self._thread_pool.waitForDone(3000)
         super().closeEvent(event)

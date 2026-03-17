@@ -88,3 +88,12 @@ class TestDownloadWorker:
         assert len(tracks) == 2
         assert all(t.artist == "<Downloads>" for t in tracks)
         worker.signals.error.emit.assert_not_called()
+
+    def test_cancel_kills_process(self):
+        worker = DownloadWorker("test123", Path("/downloads"))
+        mock_proc = MagicMock()
+        worker._process = mock_proc
+
+        worker.cancel()
+
+        mock_proc.kill.assert_called_once()

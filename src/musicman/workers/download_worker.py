@@ -21,14 +21,28 @@ class DownloadWorker(QRunnable):
         self.output_dir = output_dir
         self.is_playlist = is_playlist
         self.signals = DownloadSignals()
+        self._process = None
+
+    def cancel(self):
+        """Kill the yt-dlp subprocess if running."""
+        proc = self._process
+        if proc is not None:
+            proc.kill()
+
+    def _on_process(self, proc):
+        self._process = proc
 
     @Slot()
     def run(self):
         try:
             if self.is_playlist:
-                filepaths = download_playlist_audio(self.id_value, self.output_dir)
+                filepaths = download_playlist_audio(
+                    self.id_value, self.output_dir, process_callback=self._on_process,
+                )
             else:
-                filepaths = [download_video_audio(self.id_value, self.output_dir)]
+                filepaths = [download_video_audio(
+                    self.id_value, self.output_dir, process_callback=self._on_process,
+                )]
 
             tracks = []
             for filepath in filepaths:
@@ -42,3 +56,5 @@ class DownloadWorker(QRunnable):
             self.signals.finished.emit(tracks)
         except Exception as e:
             self.signals.error.emit(str(e))
+        finally:
+            self._process = None
