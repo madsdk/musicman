@@ -49,7 +49,7 @@ class LibraryPanel(QWidget):
         """Load tracks into the library model."""
         self._library_model.load_tracks(tracks)
         self._apply_header_modes()
-        self._music_view.expandAll()
+        self._music_view.collapseAll()
 
     def _on_add_clicked(self):
         """Add selected artist/album/track nodes to the queue."""
