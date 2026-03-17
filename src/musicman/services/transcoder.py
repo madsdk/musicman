@@ -4,6 +4,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from musicman.services.paths import get_binary
+
 
 class TranscodeError(Exception):
     pass
@@ -11,7 +13,7 @@ class TranscodeError(Exception):
 
 def check_ffmpeg() -> bool:
     """Check if ffmpeg is available."""
-    return shutil.which("ffmpeg") is not None
+    return shutil.which(get_binary("ffmpeg")) is not None
 
 
 def build_ffmpeg_command(
@@ -23,7 +25,7 @@ def build_ffmpeg_command(
 ) -> list[str]:
     """Build the ffmpeg command for transcoding to MP3."""
     cmd = [
-        "ffmpeg", "-y",
+        get_binary("ffmpeg"), "-y",
         "-i", str(input_path),
         "-vn",  # no video
     ]

@@ -4,6 +4,8 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
+from musicman.services.paths import get_binary
+
 
 class DownloadError(Exception):
     """Raised when a yt-dlp download fails."""
@@ -51,7 +53,7 @@ def download_video_audio(
     before = _files_in(output_dir)
 
     cmd = [
-        "yt-dlp",
+        get_binary("yt-dlp"),
         "--ignore-config",
         "--no-playlist",
         "--extract-audio",
@@ -87,7 +89,7 @@ def download_playlist_audio(
     before = _files_in(output_dir)
 
     cmd = [
-        "yt-dlp",
+        get_binary("yt-dlp"),
         "--ignore-config",
         "--extract-audio",
         "--audio-format", "best",

@@ -67,6 +67,21 @@ Run tests:
 pytest tests/ -v
 ```
 
+### Building a macOS .app bundle
+
+MusicMan can be packaged as a self-contained macOS application using PyInstaller. The bundle includes Python, PySide6, mutagen, yt-dlp, and ffmpeg — no external dependencies needed at runtime.
+
+```bash
+pip install -e ".[dev]"
+bash scripts/build_macos.sh
+```
+
+The resulting app bundle is written to `dist/MusicMan.app`. You can drag it into `/Applications` or distribute it directly.
+
+**Requirements for the build machine:**
+- macOS with ffmpeg installed (bundled into the app automatically)
+- yt-dlp installed (`pip install yt-dlp`) if you want YouTube download support in the bundle
+
 ### Project structure
 
 ```
