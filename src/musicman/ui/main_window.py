@@ -4,7 +4,9 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtWidgets import (
+    QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMenuBar,
     QPushButton,
@@ -21,6 +23,8 @@ from musicman.ui.library_panel import LibraryPanel
 from musicman.ui.queue_panel import QueuePanel
 from musicman.ui.settings_dialog import SettingsDialog
 from musicman.ui.transfer_progress import TransferProgressDialog
+from musicman.services.scanner import scan_directory, read_track
+from musicman.workers.download_worker import DownloadWorker
 from musicman.workers.scan_worker import ScanWorker
 from musicman.workers.transfer_worker import TransferWorker
 
@@ -31,6 +35,7 @@ class MainWindow(QMainWindow):
         self._settings = Settings()
         self._thread_pool = QThreadPool()
         self._transfer_worker: TransferWorker | None = None
+        self._all_tracks: list = []
 
         self.setWindowTitle("MusicMan")
         self.setMinimumSize(900, 600)
@@ -73,6 +78,17 @@ class MainWindow(QMainWindow):
         self._device_selector.device_changed.connect(self._on_device_changed)
         layout.addWidget(self._device_selector, stretch=0)
 
+        # YouTube download bar
+        dl_bar = QHBoxLayout()
+        self._url_edit = QLineEdit()
+        self._url_edit.setPlaceholderText("YouTube URL...")
+        dl_bar.addWidget(self._url_edit)
+        self._download_btn = QPushButton("Download")
+        self._download_btn.clicked.connect(self._on_download)
+        self._download_btn.setEnabled(bool(self._settings.download_folder))
+        dl_bar.addWidget(self._download_btn)
+        layout.addLayout(dl_bar)
+
         # Three-panel splitter
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -113,6 +129,7 @@ class MainWindow(QMainWindow):
             new_root = self._settings.library_root
             if new_root and new_root != old_root:
                 self._scan_library(new_root)
+            self._download_btn.setEnabled(bool(self._settings.download_folder))
 
     def _show_about(self):
         from PySide6.QtWidgets import QMessageBox
@@ -132,11 +149,51 @@ class MainWindow(QMainWindow):
         self._thread_pool.start(worker)
 
     def _on_scan_finished(self, tracks):
-        self._library_panel.load_tracks(tracks)
-        self._statusbar.showMessage(f"Loaded {len(tracks)} tracks.")
+        self._all_tracks = list(tracks)
+        # Also scan download folder if set and different from library root
+        dl_folder = self._settings.download_folder
+        if dl_folder and dl_folder != self._settings.library_root:
+            dl_path = Path(dl_folder)
+            if dl_path.is_dir():
+                dl_tracks = scan_directory(dl_path)
+                for t in dl_tracks:
+                    t.artist = "<Downloads>"
+                self._all_tracks.extend(dl_tracks)
+        self._library_panel.load_tracks(self._all_tracks)
+        self._statusbar.showMessage(f"Loaded {len(self._all_tracks)} tracks.")
 
     def _on_scan_error(self, msg):
         self._statusbar.showMessage(f"Scan error: {msg}")
+
+    def _on_download(self):
+        url = self._url_edit.text().strip()
+        if not url:
+            self._statusbar.showMessage("Please enter a YouTube URL.")
+            return
+
+        dl_folder = self._settings.download_folder
+        if not dl_folder:
+            self._statusbar.showMessage("Set a download folder in Settings first.")
+            return
+
+        self._download_btn.setEnabled(False)
+        self._statusbar.showMessage("Downloading...")
+
+        worker = DownloadWorker(url, Path(dl_folder))
+        worker.signals.finished.connect(self._on_download_finished)
+        worker.signals.error.connect(self._on_download_error)
+        self._thread_pool.start(worker)
+
+    def _on_download_finished(self, track):
+        self._all_tracks.append(track)
+        self._library_panel.load_tracks(self._all_tracks)
+        self._statusbar.showMessage(f"Downloaded: {track.display_title}")
+        self._url_edit.clear()
+        self._download_btn.setEnabled(True)
+
+    def _on_download_error(self, msg):
+        self._statusbar.showMessage(f"Download error: {msg}")
+        self._download_btn.setEnabled(True)
 
     def _on_device_changed(self, path):
         self._settings.device_path = path

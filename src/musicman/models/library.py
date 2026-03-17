@@ -26,7 +26,11 @@ class LibraryModel(QStandardItemModel):
             tree.setdefault(t.artist, {}).setdefault(t.album, []).append(t)
 
         root = self.invisibleRootItem()
-        for artist_name in sorted(tree):
+        # Sort artists with <Downloads> always first
+        def _artist_sort_key(name: str) -> tuple[int, str]:
+            return (0, name) if name == "<Downloads>" else (1, name)
+
+        for artist_name in sorted(tree, key=_artist_sort_key):
             artist_item = QStandardItem(artist_name)
             artist_item.setEditable(False)
             artist_dur = QStandardItem()

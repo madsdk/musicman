@@ -16,6 +16,14 @@ class Settings:
         self._s.setValue("library/root", value)
 
     @property
+    def download_folder(self) -> str:
+        return self._s.value("download/folder", "", type=str)
+
+    @download_folder.setter
+    def download_folder(self, value: str):
+        self._s.setValue("download/folder", value)
+
+    @property
     def device_path(self) -> str:
         return self._s.value("device/path", "", type=str)
 

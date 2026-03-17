@@ -6,18 +6,21 @@ A PySide6 desktop app for managing music on old-school MP3 players that play fil
 
 - Python 3.10+
 - ffmpeg (for transcoding non-MP3 files)
+- yt-dlp (optional, for downloading audio from YouTube)
 
-Install ffmpeg via your package manager:
+Install system dependencies via your package manager:
 
 ```bash
 # Arch
-sudo pacman -S ffmpeg
+sudo pacman -S ffmpeg yt-dlp
 
 # Debian/Ubuntu
 sudo apt install ffmpeg
+pip install yt-dlp
 
 # Fedora
 sudo dnf install ffmpeg
+pip install yt-dlp
 ```
 
 ## Setup
@@ -36,7 +39,7 @@ musicman
 python -m musicman
 ```
 
-On first launch, open **File > Settings** to set your library root folder. The app will scan it recursively for MP3, FLAC, OGG, WAV, AAC, and WMA files.
+On first launch, open **File > Settings** to set your library root folder. The app will scan it recursively for MP3, FLAC, OGG, WAV, AAC, and WMA files. Optionally set a **download folder** to enable YouTube downloads.
 
 ## Usage
 
@@ -45,6 +48,10 @@ On first launch, open **File > Settings** to set your library root folder. The a
 3. **Device** (right panel) — Lists files on the selected device. Delete files with confirmation.
 
 The device selector bar at the top auto-detects removable volumes mounted under `/media`, `/run/media`, or `/mnt`. You can also type or browse to a path manually.
+
+### YouTube downloads
+
+With a download folder configured in Settings and `yt-dlp` installed, paste a YouTube URL into the bar below the device selector and click **Download**. The audio is extracted in the best available quality (no re-encode) and appears in the library under the **\<Downloads\>** artist. Downloaded tracks can be queued and transferred like any other track.
 
 ## Development
 
@@ -75,6 +82,7 @@ src/musicman/
 │   ├── scanner.py           # Recursive scan + mutagen metadata
 │   ├── transcoder.py        # ffmpeg wrapper
 │   ├── transfer.py          # Transfer orchestrator
+│   ├── downloader.py        # yt-dlp wrapper for YouTube audio
 │   ├── device_detect.py     # Removable volume detection
 │   └── settings.py          # QSettings wrapper
 ├── ui/
@@ -87,5 +95,6 @@ src/musicman/
 │   └── transfer_progress.py # Progress dialog
 └── workers/
     ├── scan_worker.py       # Background library scan
+    ├── download_worker.py   # Background YouTube download
     └── transfer_worker.py   # Background transfer with progress
 ```
