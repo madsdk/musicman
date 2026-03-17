@@ -56,6 +56,7 @@ def download_video_audio(
         "--no-playlist",
         "--extract-audio",
         "--audio-format", "best",
+        "--embed-metadata",
         "--output", template,
         url,
     ]
@@ -90,6 +91,7 @@ def download_playlist_audio(
         "--ignore-config",
         "--extract-audio",
         "--audio-format", "best",
+        "--embed-metadata",
         "--output", template,
         url,
     ]

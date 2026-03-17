@@ -50,6 +50,8 @@ class DownloadWorker(QRunnable):
                 if track is None:
                     self.signals.error.emit(f"Could not read metadata from {filepath}")
                     return
+                if track.album == "Unknown Album":
+                    track.album = track.artist
                 track.artist = "<Downloads>"
                 tracks.append(track)
 
