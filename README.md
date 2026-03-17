@@ -51,7 +51,7 @@ The device selector bar at the top auto-detects removable volumes mounted under 
 
 ### YouTube downloads
 
-With a download folder configured in Settings and `yt-dlp` installed, paste a YouTube URL into the bar below the device selector and click **Download**. The audio is extracted in the best available quality (no re-encode) and appears in the library under the **\<Downloads\>** artist. Downloaded tracks can be queued and transferred like any other track.
+With a download folder configured in Settings and `yt-dlp` installed, enter a YouTube video ID or playlist ID into the bar below the device selector, select **Video** or **Playlist**, and click **Download**. The audio is extracted in the best available quality (no re-encode) and appears in the library under the **\<Downloads\>** artist. Downloaded tracks can be queued and transferred like any other track.
 
 ## Development
 

@@ -5,38 +5,37 @@ from unittest.mock import patch
 
 import pytest
 
-from musicman.services.downloader import DownloadError, download_audio
+from musicman.services.downloader import DownloadError, download_video_audio, download_playlist_audio
 
 
-class TestDownloadAudio:
+class TestDownloadVideoAudio:
     @patch("musicman.services.downloader.subprocess.run")
     def test_successful_download(self, mock_run, tmp_path):
+        # Pre-create the output file so it appears as a "new" file
         output_file = tmp_path / "Test Video.opus"
-        output_file.write_bytes(b"fake audio")
 
-        mock_run.return_value = type("Result", (), {
-            "stdout": f"{output_file}\n",
-            "stderr": "",
-            "returncode": 0,
-        })()
+        def fake_run(*args, **kwargs):
+            output_file.write_bytes(b"fake audio")
+            return type("Result", (), {"stdout": "", "stderr": "", "returncode": 0})()
 
-        result = download_audio("https://youtube.com/watch?v=test", tmp_path)
+        mock_run.side_effect = fake_run
+
+        result = download_video_audio("test123", tmp_path)
         assert result == output_file
 
         cmd = mock_run.call_args[0][0]
         assert cmd[0] == "yt-dlp"
+        assert "--no-playlist" in cmd
         assert "--extract-audio" in cmd
         assert "--audio-format" in cmd
         assert "best" in cmd
-        assert "--print" in cmd
-        assert "after_move:filepath" in cmd
-        assert "https://youtube.com/watch?v=test" in cmd
+        assert "https://www.youtube.com/watch?v=test123" in cmd
 
     @patch("musicman.services.downloader.subprocess.run")
     def test_yt_dlp_not_installed(self, mock_run, tmp_path):
         mock_run.side_effect = FileNotFoundError()
         with pytest.raises(DownloadError, match="yt-dlp is not installed"):
-            download_audio("https://youtube.com/watch?v=test", tmp_path)
+            download_video_audio("test123", tmp_path)
 
     @patch("musicman.services.downloader.subprocess.run")
     def test_yt_dlp_failure(self, mock_run, tmp_path):
@@ -45,32 +44,62 @@ class TestDownloadAudio:
             1, "yt-dlp", stderr="Invalid URL"
         )
         with pytest.raises(DownloadError, match="yt-dlp failed"):
-            download_audio("https://youtube.com/watch?v=bad", tmp_path)
+            download_video_audio("bad_id", tmp_path)
 
     @patch("musicman.services.downloader.subprocess.run")
-    def test_empty_stdout(self, mock_run, tmp_path):
+    def test_no_output_file(self, mock_run, tmp_path):
         mock_run.return_value = type("Result", (), {
-            "stdout": "",
-            "stderr": "",
-            "returncode": 0,
+            "stdout": "", "stderr": "", "returncode": 0,
         })()
-        with pytest.raises(DownloadError, match="did not report"):
-            download_audio("https://youtube.com/watch?v=test", tmp_path)
+        with pytest.raises(DownloadError, match="did not produce"):
+            download_video_audio("test123", tmp_path)
 
     @patch("musicman.services.downloader.subprocess.run")
     def test_creates_output_dir(self, mock_run, tmp_path):
         out_dir = tmp_path / "new_subdir"
         output_file = out_dir / "video.opus"
 
-        # Pre-create so the file exists check passes
-        out_dir.mkdir()
-        output_file.write_bytes(b"fake")
+        def fake_run(*args, **kwargs):
+            output_file.write_bytes(b"fake")
+            return type("Result", (), {"stdout": "", "stderr": "", "returncode": 0})()
 
-        mock_run.return_value = type("Result", (), {
-            "stdout": f"{output_file}\n",
-            "stderr": "",
-            "returncode": 0,
-        })()
+        mock_run.side_effect = fake_run
 
-        result = download_audio("https://youtube.com/watch?v=test", out_dir)
+        result = download_video_audio("test123", out_dir)
         assert result == output_file
+
+
+class TestDownloadPlaylistAudio:
+    @patch("musicman.services.downloader.subprocess.run")
+    def test_successful_playlist_download(self, mock_run, tmp_path):
+        file1 = tmp_path / "Song One.opus"
+        file2 = tmp_path / "Song Two.opus"
+
+        def fake_run(*args, **kwargs):
+            file1.write_bytes(b"fake audio 1")
+            file2.write_bytes(b"fake audio 2")
+            return type("Result", (), {"stdout": "", "stderr": "", "returncode": 0})()
+
+        mock_run.side_effect = fake_run
+
+        result = download_playlist_audio("PLtest123", tmp_path)
+        assert set(result) == {file1, file2}
+
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "yt-dlp"
+        assert "--no-playlist" not in cmd
+        assert "https://www.youtube.com/playlist?list=PLtest123" in cmd
+
+    @patch("musicman.services.downloader.subprocess.run")
+    def test_no_output_files(self, mock_run, tmp_path):
+        mock_run.return_value = type("Result", (), {
+            "stdout": "", "stderr": "", "returncode": 0,
+        })()
+        with pytest.raises(DownloadError, match="did not produce"):
+            download_playlist_audio("PLtest123", tmp_path)
+
+    @patch("musicman.services.downloader.subprocess.run")
+    def test_yt_dlp_not_installed(self, mock_run, tmp_path):
+        mock_run.side_effect = FileNotFoundError()
+        with pytest.raises(DownloadError, match="yt-dlp is not installed"):
+            download_playlist_audio("PLtest123", tmp_path)

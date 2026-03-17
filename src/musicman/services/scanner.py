@@ -6,7 +6,7 @@ import mutagen
 
 from musicman.models.track import Track
 
-SUPPORTED_EXTENSIONS = {".mp3", ".flac", ".ogg", ".wav", ".aac", ".wma"}
+SUPPORTED_EXTENSIONS = {".mp3", ".flac", ".ogg", ".wav", ".aac", ".wma", ".opus", ".m4a", ".webm"}
 
 
 def scan_directory(root: Path) -> list[Track]:

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenuBar,
     QPushButton,
+    QRadioButton,
     QSplitter,
     QStatusBar,
     QVBoxLayout,
@@ -48,6 +49,8 @@ class MainWindow(QMainWindow):
         # Load library if root is set
         if self._settings.library_root:
             self._scan_library(self._settings.library_root)
+        else:
+            self._load_downloads()
 
         # Load device if path is set
         if self._settings.device_path:
@@ -80,9 +83,14 @@ class MainWindow(QMainWindow):
 
         # YouTube download bar
         dl_bar = QHBoxLayout()
-        self._url_edit = QLineEdit()
-        self._url_edit.setPlaceholderText("YouTube URL...")
-        dl_bar.addWidget(self._url_edit)
+        self._id_edit = QLineEdit()
+        self._id_edit.setPlaceholderText("Video or playlist ID...")
+        dl_bar.addWidget(self._id_edit)
+        self._video_radio = QRadioButton("Video")
+        self._video_radio.setChecked(True)
+        dl_bar.addWidget(self._video_radio)
+        self._playlist_radio = QRadioButton("Playlist")
+        dl_bar.addWidget(self._playlist_radio)
         self._download_btn = QPushButton("Download")
         self._download_btn.clicked.connect(self._on_download)
         self._download_btn.setEnabled(bool(self._settings.download_folder))
@@ -150,7 +158,12 @@ class MainWindow(QMainWindow):
 
     def _on_scan_finished(self, tracks):
         self._all_tracks = list(tracks)
-        # Also scan download folder if set and different from library root
+        self._load_downloads()
+        self._library_panel.load_tracks(self._all_tracks)
+        self._statusbar.showMessage(f"Loaded {len(self._all_tracks)} tracks.")
+
+    def _load_downloads(self):
+        """Scan the download folder and add tracks as <Downloads>."""
         dl_folder = self._settings.download_folder
         if dl_folder and dl_folder != self._settings.library_root:
             dl_path = Path(dl_folder)
@@ -159,16 +172,19 @@ class MainWindow(QMainWindow):
                 for t in dl_tracks:
                     t.artist = "<Downloads>"
                 self._all_tracks.extend(dl_tracks)
-        self._library_panel.load_tracks(self._all_tracks)
-        self._statusbar.showMessage(f"Loaded {len(self._all_tracks)} tracks.")
+        if not self._settings.library_root:
+            self._library_panel.load_tracks(self._all_tracks)
+            count = len(self._all_tracks)
+            if count:
+                self._statusbar.showMessage(f"Loaded {count} downloaded track(s).")
 
     def _on_scan_error(self, msg):
         self._statusbar.showMessage(f"Scan error: {msg}")
 
     def _on_download(self):
-        url = self._url_edit.text().strip()
-        if not url:
-            self._statusbar.showMessage("Please enter a YouTube URL.")
+        id_value = self._id_edit.text().strip()
+        if not id_value:
+            self._statusbar.showMessage("Please enter a video or playlist ID.")
             return
 
         dl_folder = self._settings.download_folder
@@ -179,16 +195,18 @@ class MainWindow(QMainWindow):
         self._download_btn.setEnabled(False)
         self._statusbar.showMessage("Downloading...")
 
-        worker = DownloadWorker(url, Path(dl_folder))
+        is_playlist = self._playlist_radio.isChecked()
+        worker = DownloadWorker(id_value, Path(dl_folder), is_playlist=is_playlist)
         worker.signals.finished.connect(self._on_download_finished)
         worker.signals.error.connect(self._on_download_error)
         self._thread_pool.start(worker)
 
-    def _on_download_finished(self, track):
-        self._all_tracks.append(track)
+    def _on_download_finished(self, tracks):
+        self._all_tracks.extend(tracks)
         self._library_panel.load_tracks(self._all_tracks)
-        self._statusbar.showMessage(f"Downloaded: {track.display_title}")
-        self._url_edit.clear()
+        count = len(tracks)
+        self._statusbar.showMessage(f"Downloaded {count} track(s).")
+        self._id_edit.clear()
         self._download_btn.setEnabled(True)
 
     def _on_download_error(self, msg):
