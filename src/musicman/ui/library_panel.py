@@ -47,10 +47,7 @@ class LibraryPanel(QWidget):
         self._music_view = QTreeView()
         self._music_view.setModel(self._library_model)
         self._music_view.setSelectionMode(QTreeView.SelectionMode.ExtendedSelection)
-        self._music_view.header().setStretchLastSection(False)
-        self._music_view.header().setSectionResizeMode(
-            0, self._music_view.header().ResizeMode.Stretch
-        )
+        self._apply_header_modes()
         self._music_view.doubleClicked.connect(self._on_double_click)
         self._splitter.addWidget(self._music_view)
 
@@ -76,10 +73,17 @@ class LibraryPanel(QWidget):
         root_index = self._folder_model.setRootPath(root)
         self._folder_view.setRootIndex(root_index)
 
+    def _apply_header_modes(self):
+        header = self._music_view.header()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, header.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, header.ResizeMode.ResizeToContents)
+
     def load_tracks(self, tracks: list[Track]):
         """Load tracks into the library model."""
         self._all_tracks = tracks
         self._library_model.load_tracks(tracks)
+        self._apply_header_modes()
         self._music_view.expandAll()
 
     def _on_folder_selected(self, current, _previous):
@@ -87,10 +91,11 @@ class LibraryPanel(QWidget):
         path = self._folder_model.filePath(current)
         if not path:
             self._library_model.load_tracks(self._all_tracks)
-            return
-        folder = Path(path)
-        filtered = [t for t in self._all_tracks if folder in t.path.parents or t.path.parent == folder]
-        self._library_model.load_tracks(filtered)
+        else:
+            folder = Path(path)
+            filtered = [t for t in self._all_tracks if folder in t.path.parents or t.path.parent == folder]
+            self._library_model.load_tracks(filtered)
+        self._apply_header_modes()
         self._music_view.expandAll()
 
     def _on_add_clicked(self):

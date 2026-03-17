@@ -71,7 +71,7 @@ class MainWindow(QMainWindow):
         # Device selector bar
         self._device_selector = DeviceSelector()
         self._device_selector.device_changed.connect(self._on_device_changed)
-        layout.addWidget(self._device_selector)
+        layout.addWidget(self._device_selector, stretch=0)
 
         # Three-panel splitter
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -99,7 +99,7 @@ class MainWindow(QMainWindow):
         self._splitter.addWidget(self._device_panel)
 
         self._splitter.setSizes([350, 300, 250])
-        layout.addWidget(self._splitter)
+        layout.addWidget(self._splitter, stretch=1)
 
     def _setup_statusbar(self):
         self._statusbar = QStatusBar()
