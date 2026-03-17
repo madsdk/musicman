@@ -1,5 +1,6 @@
 """QRunnable for background YouTube audio download."""
 
+import threading
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
@@ -21,27 +22,22 @@ class DownloadWorker(QRunnable):
         self.output_dir = output_dir
         self.is_playlist = is_playlist
         self.signals = DownloadSignals()
-        self._process = None
+        self._cancel_event = threading.Event()
 
     def cancel(self):
-        """Kill the yt-dlp subprocess if running."""
-        proc = self._process
-        if proc is not None:
-            proc.kill()
-
-    def _on_process(self, proc):
-        self._process = proc
+        """Signal the yt-dlp download to stop."""
+        self._cancel_event.set()
 
     @Slot()
     def run(self):
         try:
             if self.is_playlist:
                 filepaths = download_playlist_audio(
-                    self.id_value, self.output_dir, process_callback=self._on_process,
+                    self.id_value, self.output_dir, cancel_event=self._cancel_event,
                 )
             else:
                 filepaths = [download_video_audio(
-                    self.id_value, self.output_dir, process_callback=self._on_process,
+                    self.id_value, self.output_dir, cancel_event=self._cancel_event,
                 )]
 
             tracks = []
@@ -58,5 +54,3 @@ class DownloadWorker(QRunnable):
             self.signals.finished.emit(tracks)
         except Exception as e:
             self.signals.error.emit(str(e))
-        finally:
-            self._process = None

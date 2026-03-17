@@ -1,8 +1,9 @@
 """Download audio from YouTube using yt-dlp."""
 
-import subprocess
+import threading
 from pathlib import Path
-from typing import Callable
+
+import yt_dlp
 
 from musicman.services.paths import get_binary
 
@@ -18,28 +19,55 @@ def _files_in(directory: Path) -> set[Path]:
     return {p for p in directory.iterdir() if p.is_file()}
 
 
-def _run_ytdlp(cmd: list[str], process_callback: Callable | None = None) -> None:
-    """Run a yt-dlp command, optionally exposing the Popen object via callback."""
+def _base_opts(template: str) -> dict:
+    """Return yt-dlp options common to single-video and playlist downloads."""
+    ffmpeg = get_binary("ffmpeg")
+    opts: dict = {
+        "format": "bestaudio/best",
+        "postprocessors": [
+            {"key": "FFmpegExtractAudio", "preferredcodec": "best"},
+            {"key": "FFmpegMetadata"},
+        ],
+        "outtmpl": template,
+        "quiet": True,
+        "no_warnings": True,
+    }
+    if ffmpeg != "ffmpeg":
+        opts["ffmpeg_location"] = str(Path(ffmpeg).parent)
+    return opts
+
+
+def _run_ytdlp(
+    url: str,
+    opts: dict,
+    cancel_event: threading.Event | None = None,
+) -> None:
+    """Run a yt-dlp download, checking cancel_event between entries."""
+    if cancel_event and cancel_event.is_set():
+        raise DownloadError("Download cancelled")
+
+    def _progress_hook(d: dict) -> None:
+        if cancel_event and cancel_event.is_set():
+            raise DownloadError("Download cancelled")
+
+    opts["progress_hooks"] = [_progress_hook]
+
     try:
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-        )
-    except FileNotFoundError:
-        raise DownloadError("yt-dlp is not installed. Install it with: pip install yt-dlp")
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ret = ydl.download([url])
+    except DownloadError:
+        raise
+    except Exception as e:
+        raise DownloadError(f"yt-dlp failed: {e}")
 
-    if process_callback:
-        process_callback(proc)
-
-    _, stderr = proc.communicate()
-
-    if proc.returncode != 0:
-        raise DownloadError(f"yt-dlp failed: {stderr.strip()}")
+    if ret != 0:
+        raise DownloadError("yt-dlp failed with a non-zero exit code.")
 
 
 def download_video_audio(
     video_id: str,
     output_dir: Path,
-    process_callback: Callable | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> Path:
     """Download audio for a single YouTube video into output_dir.
 
@@ -52,18 +80,10 @@ def download_video_audio(
 
     before = _files_in(output_dir)
 
-    cmd = [
-        get_binary("yt-dlp"),
-        "--ignore-config",
-        "--no-playlist",
-        "--extract-audio",
-        "--audio-format", "best",
-        "--embed-metadata",
-        "--output", template,
-        url,
-    ]
+    opts = _base_opts(template)
+    opts["noplaylist"] = True
 
-    _run_ytdlp(cmd, process_callback)
+    _run_ytdlp(url, opts, cancel_event)
 
     new_files = _files_in(output_dir) - before
     if not new_files:
@@ -75,7 +95,7 @@ def download_video_audio(
 def download_playlist_audio(
     playlist_id: str,
     output_dir: Path,
-    process_callback: Callable | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> list[Path]:
     """Download audio for all videos in a YouTube playlist.
 
@@ -88,17 +108,9 @@ def download_playlist_audio(
 
     before = _files_in(output_dir)
 
-    cmd = [
-        get_binary("yt-dlp"),
-        "--ignore-config",
-        "--extract-audio",
-        "--audio-format", "best",
-        "--embed-metadata",
-        "--output", template,
-        url,
-    ]
+    opts = _base_opts(template)
 
-    _run_ytdlp(cmd, process_callback)
+    _run_ytdlp(url, opts, cancel_event)
 
     new_files = _files_in(output_dir) - before
     if not new_files:
